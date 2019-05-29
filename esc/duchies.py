@@ -574,9 +574,9 @@ def format_duchies_table():
             row['Largest county'] = largest_county
             coasts = sum(county.coastal() for county in counties)
             row['Coasts'] = coasts
-            row['Other names'] = ', '.join(duchy.other_names)
+            #row['Other names'] = ', '.join(duchy.other_names)
+            row['Other names'] = ', '.join(dict_tr[each] if (each in dict_tr) else each for each in duchy.other_names)
             row['ID'] = duchy.codename
-            # mytran(row)
             yield row
 
     sorted_rows = sorted(rows(), key=operator.itemgetter('Empire', 'Kingdom',
@@ -616,9 +616,9 @@ def format_counties_table():
                 row['{} holdings'.format(start[0])] = datum
             row['Max holdings'] = county.max_holdings
             row['Coastal'] = 'yes' if county.coastal() else 'no'
-            row['Other names'] = ', '.join(county.other_names)
+            #row['Other names'] = ', '.join(county.other_names)
+            row['Other names'] = ', '.join(dict_tr[each] if (each in dict_tr) else each for each in county.other_names)
             row['Title ID'] = county.codename
-            # mytran(row)
             yield row
 
     sorted_rows = sorted(rows(), key=operator.itemgetter('ID'))
@@ -723,7 +723,6 @@ def format_other_provs_table():
                                     Title.id_name_map[prov])
             row['Name'] = name
             row['Type'] = categ
-            # mytran(row)
             yield row
 
     sorted_rows = sorted(rows(), key=operator.itemgetter('ID'))

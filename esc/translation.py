@@ -39,11 +39,14 @@ def get_tr(path="./data/raw"):  # 文件夹目录
         # create map
     return dict_tr
 
-def get_location(path="./data/raw"):  # 文件夹目录
+def get_location(path="./data/raw"):
     tr_raw = myopen(path)
     dict_tr = dict()
     for i in tr_raw:
-        dict_tr[i[0]] = i[2]
+        if len(i[2])!=0:
+            dict_tr[i[0]] = i[2]
+        else:
+            dict_tr[i[0]] = i[1]
         # create map
     return dict_tr
 
