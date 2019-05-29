@@ -32,6 +32,8 @@ import PIL.Image
 import tabulate
 import ck2parser
 
+import translation
+
 rootpath = ck2parser.rootpath
 
 modpaths = []
@@ -46,6 +48,8 @@ CKII_DIR = ck2parser.vanilladir
 
 OUTPUT_FILE = rootpath / 'table.txt'
 
+cultures = []
+localisation = {}
 if not modpaths:
     borders_path = rootpath / 'borderlayer.png'
 elif modpaths[0].name == 'SWMH':
@@ -55,6 +59,7 @@ else:
 
 EARLIEST_DATE = (float('-inf'),) * 3
 LATEST_DATE = (float('inf'),) * 3
+
 
 class Interval:
     def __init__(self, start, stop):
@@ -66,6 +71,7 @@ class Interval:
             return self.start <= item < self.stop
         except TypeError:
             return False
+
 
 class Title:
     instances = collections.OrderedDict()
@@ -127,7 +133,7 @@ class Title:
     def set_id(self, province_id):
         if not province_id > 0:
             raise ValueError('{} province id {} is nonpositive'.format(
-                             self.codename, province_id))
+                self.codename, province_id))
         self.id = province_id
         Title.id_title_map[province_id] = self
         if self.codename.startswith('c_'):
@@ -184,7 +190,7 @@ class Title:
     def culture(self, when=EARLIEST_DATE):
         try:
             culture = self.cultures[max(date for date in self.cultures if
-                                    date <= when)]
+                                        date <= when)]
         except ValueError:
             return None
         return localisation.get(culture, culture)
@@ -192,7 +198,7 @@ class Title:
     def religion(self, when=EARLIEST_DATE):
         try:
             religion = self.religions[max(date for date in self.religions if
-                                      date <= when)]
+                                          date <= when)]
         except ValueError:
             return None
         return localisation.get(religion, religion)
@@ -204,8 +210,6 @@ class Title:
     def coastal(self):
         return any(x in Title.seas for x in Title.province_graph[self.id])
 
-cultures = []
-localisation = {}
 
 def parse_files(glob):
     for path in files(glob):
@@ -215,6 +219,7 @@ def parse_files(glob):
             print(path)
             raise
 
+
 def parse_file(path):
     tree = parser.parse_file(path)
 
@@ -222,6 +227,7 @@ def parse_file(path):
         return x.val if hasattr(x, 'val') else [unbox(y) for y in x]
 
     return unbox(tree)
+
 
 # give mod dirs in descending lexicographical order of mod name (Z-A),
 # modified for dependencies as necessary.
@@ -232,10 +238,12 @@ def files(glob, basedir=CKII_DIR, reverse=False):
                        reverse=reverse):
         yield p
 
+
 def process_cultures(cultures_txts):
     for _, v in cultures_txts:
         cultures.extend(n2 for _, v1 in v for n2, v2 in v1
                         if isinstance(v2, list))
+
 
 # pre: process_localisation
 # pre: process_cultures
@@ -256,6 +264,7 @@ def process_landed_titles(landed_titles_txts):
     for _, v in landed_titles_txts:
         recurse(v)
 
+
 # pre: process_landed_titles
 def process_provinces(provinces_txts):
     _, tree = next(parse_files('map/default.map'))
@@ -264,11 +273,13 @@ def process_provinces(provinces_txts):
     max_provinces = int(tree['max_provinces'])
     id_name_map = {}
     defs_path = next(files('map/' + defs))
+
     def row_func(row):
         try:
             id_name_map[int(row[0])] = row[4]
         except (IndexError, ValueError):
             pass
+
     parse_csv(defs_path, row_func)
     for n, v in provinces_txts:
         id_str, name = n.split(' - ')
@@ -285,8 +296,12 @@ def process_provinces(provinces_txts):
         if title.name == title.codename:
             title.set_name(name)
         title.max_holdings = v_dict['max_settlements']
-        title.cultures[EARLIEST_DATE] = v_dict['culture']
-        title.religions[EARLIEST_DATE] = v_dict['religion']
+        if 'culture' not in v_dict:
+            # new abyssal duchy in greek is no culture and religion(it is a wasteland)
+            pass
+        else:
+            title.cultures[EARLIEST_DATE] = v_dict['culture']
+            title.religions[EARLIEST_DATE] = v_dict['religion']
         for n1, v1 in v:
             if Title.valid_codename(n1):
                 try:
@@ -310,6 +325,7 @@ def process_provinces(provinces_txts):
                           re.fullmatch(r'castle|city|temple|tribal', v2)):
                         Title.get(n2).build(n1)
 
+
 def process_titles(titles_txts):
     for n, v in titles_txts:
         try:
@@ -326,6 +342,7 @@ def process_titles(titles_txts):
                 if name_key:
                     title.add_other_name(localisation.get(name_key, name_key))
 
+
 def parse_csvs(paths, row_func):
     for path in paths:
         try:
@@ -334,17 +351,20 @@ def parse_csvs(paths, row_func):
             print(path)
             raise
 
+
 def parse_csv(path, row_func):
     with path.open(encoding='cp1252', errors='ignore') as csvfile:
         reader = csv.reader(csvfile, dialect='ckii')
         for row in reader:
             row_func(row)
 
+
 def process_localisation_row(row):
     if len(row) >= 2:
         key, value, *_ = row
         if '#' not in key and key not in localisation:
             localisation[key] = value
+
 
 # pre: process_provinces
 def process_default_map(default_map):
@@ -360,6 +380,7 @@ def process_default_map(default_map):
     return tuple(next(files('map/' + v_dict[key])) for key in
                  ['definitions', 'provinces', 'adjacencies'])
 
+
 # pre: process default_map, provinces
 def process_map_definitions_row(row):
     try:
@@ -374,6 +395,7 @@ def process_map_definitions_row(row):
         key = tuple(numpy.uint8(x) for x in (red, green, blue))
         Title.rgb_id_map[key] = province
         Title.id_name_map[province] = row[4]
+
 
 # pre: process map definitions
 def parse_map_provinces(path):
@@ -392,6 +414,7 @@ def parse_map_provinces(path):
                     Title.province_graph.add_edge(province, neighbor)
     seas_lakes = Title.province_graph.subgraph(Title.waters - Title.rivers)
     Title.seas = {x for x in seas_lakes if seas_lakes[x]}
+
 
 def generate_province_map(in_path, out_dir, value):
     COLORMAP = {1: numpy.uint8((247, 252, 245)),
@@ -446,7 +469,7 @@ def generate_province_map(in_path, out_dir, value):
         vmin, vmax = 1, 7
     elif value == 'defined_baronies_minus_max_settlements':
         title_value = lambda title: (
-            sum(1 for t in title.vassals(start)) - title.max_holdings)
+                sum(1 for t in title.vassals(start)) - title.max_holdings)
         vmin, vmax = 0, 6
     elif value == '1066_built_holdings':
         title_value = lambda title: (
@@ -454,7 +477,7 @@ def generate_province_map(in_path, out_dir, value):
         vmin, vmax = 1, 7
     elif value == 'max_settlements_minus_1066_built_holdings':
         title_value = lambda title: (
-            title.max_holdings - sum(1 for t in title.built_holdings(start)))
+                title.max_holdings - sum(1 for t in title.built_holdings(start)))
         vmin, vmax = 0, 6
     elif value.endswith('divided_by_area'):
         if not value.startswith('log_'):
@@ -465,10 +488,10 @@ def generate_province_map(in_path, out_dir, value):
         numpy.apply_along_axis(count_province_area, 2, array)
         if 'max_settlements' in value:
             title_value = lambda title: (
-                title.max_holdings / prov_area[title])
+                    title.max_holdings / prov_area[title])
         elif '1066_built_holdings' in value:
             title_value = lambda title: (
-                sum(1 for t in title.built_holdings(start)) / prov_area[title])
+                    sum(1 for t in title.built_holdings(start)) / prov_area[title])
         else:
             raise ValueError()
         # import pprint
@@ -505,6 +528,7 @@ def generate_province_map(in_path, out_dir, value):
     out_image.save(str(out_path))
     # figure.savefig(str(out_path))
 
+
 # pre: parse_map_provinces
 def process_map_adjacencies_row(row):
     try:
@@ -512,6 +536,7 @@ def process_map_adjacencies_row(row):
     except ValueError:
         return
     Title.province_graph.add_edge(from_province, to_province)
+
 
 # TODO: write secondary table for british duchies in 769
 def format_duchies_table():
@@ -531,7 +556,7 @@ def format_duchies_table():
             try:
                 empire = kingdom.liege(start_1066)
                 row['Empire'] = (empire.name
-                    if empire and empire.name != 'e_null' else '-')
+                                 if empire and empire.name != 'e_null' else '-')
             except AttributeError:
                 row['Empire'] = '-'
             start_holdings = [sum(1 for c in duchy.vassals(s) for b in
@@ -551,11 +576,13 @@ def format_duchies_table():
             row['Coasts'] = coasts
             row['Other names'] = ', '.join(duchy.other_names)
             row['ID'] = duchy.codename
+            # mytran(row)
             yield row
 
     sorted_rows = sorted(rows(), key=operator.itemgetter('Empire', 'Kingdom',
                                                          'Duchy'))
     return tabulate.tabulate(sorted_rows, headers='keys', tablefmt='mediawiki')
+
 
 def format_counties_table():
     def rows():
@@ -591,10 +618,12 @@ def format_counties_table():
             row['Coastal'] = 'yes' if county.coastal() else 'no'
             row['Other names'] = ', '.join(county.other_names)
             row['Title ID'] = county.codename
+            # mytran(row)
             yield row
 
     sorted_rows = sorted(rows(), key=operator.itemgetter('ID'))
     return tabulate.tabulate(sorted_rows, headers='keys', tablefmt='mediawiki')
+
 
 def duchy_county_stats():
     start_1066 = 1066, 9, 15
@@ -609,6 +638,7 @@ def duchy_county_stats():
     # median = statistics.median(counties)
     # print('mean: {}'.format(mean))
     # print('median: {}'.format(median))
+
 
 def provinces_info():
     start = 769, 1, 1
@@ -635,6 +665,7 @@ def provinces_info():
     # print(sum(x for x, _ in sorted(kingdom_g4_excess)))
     print('\n'.join(fives[:-43:-1]))
 
+
 def check_nomads():
     start = 769, 1, 1
     county_of_name = {}
@@ -643,7 +674,7 @@ def check_nomads():
         names = c.other_names + [c.name]
         for name in names:
             if c.codename == 'c_lothian' and name == 'Lut':
-                continue # only case of dumb duplicate
+                continue  # only case of dumb duplicate
             if name in county_of_name:
                 print('duplicate name ' + name)
                 crash = True
@@ -658,11 +689,12 @@ def check_nomads():
     print('ruler provs: {}'.format(len(ruler_provs)))
     print('clan provs: {}'.format(len(clan_provs)))
     print('ruler proportion: {:%}'.format(
-          len(ruler_provs) / (len(ruler_provs) + len(clan_provs))))
+        len(ruler_provs) / (len(ruler_provs) + len(clan_provs))))
     print('ruler holding frequencies: {}'.format(
-          [(k, len(v)) for k, v in holdings.items()]))
+        [(k, len(v)) for k, v in holdings.items()]))
     wrong = sum((holdings[k] for k in holdings if k < 5), [])
     print('wrong holdings: {}'.format([c.name for c in wrong]))
+
 
 def format_other_provs_table():
     def rows():
@@ -691,10 +723,12 @@ def format_other_provs_table():
                                     Title.id_name_map[prov])
             row['Name'] = name
             row['Type'] = categ
+            # mytran(row)
             yield row
 
     sorted_rows = sorted(rows(), key=operator.itemgetter('ID'))
     return tabulate.tabulate(sorted_rows, headers='keys', tablefmt='mediawiki')
+
 
 # def color_kingdoms():
 #     when = 1066, 9, 15
@@ -734,10 +768,13 @@ def duchy_path():
     #     'd_jiuquan'
     # }
     start_region = {
-        'd_lhasa', 'd_yarlung', 'd_shigatse', 'd_nagchu', 'd_sumparu', 'd_bhutan', 'd_purang', 'd_ngari', 'd_ladakh', 'd_dege', 'd_qamdo', 'd_nyingchi', 'd_kathmandu', 'd_gorkha', 'd_kashmir', 'd_pamir', 'd_uttaranchal', 'd_jiuquan', 'd_qinghai', 'd_nagormo', 'd_nangqen'
+        'd_lhasa', 'd_yarlung', 'd_shigatse', 'd_nagchu', 'd_sumparu', 'd_bhutan', 'd_purang', 'd_ngari', 'd_ladakh',
+        'd_dege', 'd_qamdo', 'd_nyingchi', 'd_kathmandu', 'd_gorkha', 'd_kashmir', 'd_pamir', 'd_uttaranchal',
+        'd_jiuquan', 'd_qinghai', 'd_nagormo', 'd_nangqen'
     }
     end_region = {
-        'd_marrakech', 'd_fes', 'd_tangiers', 'd_tlemcen', 'd_alger', 'd_kabylia', 'd_tunis', 'd_tripolitania', 'd_cyrenaica', 'd_alexandria', 'd_damietta', 'd_cairo', 'd_aswan'
+        'd_marrakech', 'd_fes', 'd_tangiers', 'd_tlemcen', 'd_alger', 'd_kabylia', 'd_tunis', 'd_tripolitania',
+        'd_cyrenaica', 'd_alexandria', 'd_damietta', 'd_cairo', 'd_aswan'
     }
     when = 867, 1, 1
     for u, v in Title.province_graph.edges():
@@ -770,27 +807,32 @@ def duchy_path():
     #   'd_perm',
     #   'd_yugra',
     #   'world_steppe_east']]
-      # 'd_kumul',
-      # 'd_karashar',
-      # 'd_kashgar',
-      # 'd_ferghana',
-      # 'd_samarkand',
-      # 'd_merv',
-      # 'd_khorasan',
-      # 'd_jibal',
-      # 'd_baghdad',
-      # 'd_basra',
-      # 'd_nefoud',
-      # 'd_arabia_petrae',
-      # 'd_sinai'
+    # 'd_kumul',
+    # 'd_karashar',
+    # 'd_kashgar',
+    # 'd_ferghana',
+    # 'd_samarkand',
+    # 'd_merv',
+    # 'd_khorasan',
+    # 'd_jibal',
+    # 'd_baghdad',
+    # 'd_basra',
+    # 'd_nefoud',
+    # 'd_arabia_petrae',
+    # 'd_sinai'
+
 
 # TODO: refactor stuff
 def main():
+    global dict_tr, localisation
+    dict_tr = translation.get_tr(CKII_DIR.__str__() + "\\paratranz")
     titles_txts = parse_files('history/titles/*.txt')
     provinces_txts = parse_files('history/provinces/*.txt')
     landed_titles_txts = parse_files('common/landed_titles/*.txt')
     cultures_txts = parse_files('common/cultures/*.txt')
-    parse_csvs(files('localisation/*.csv'), process_localisation_row)
+    # parse_csvs(files('localisation/*.csv'), process_localisation_row)
+    #todo:localisation Other names
+    localisation = translation.get_location(CKII_DIR.__str__() + "\\paratranz")
     process_cultures(cultures_txts)
     process_landed_titles(landed_titles_txts)
     process_provinces(provinces_txts)
@@ -812,17 +854,17 @@ def main():
 
     output = format_duchies_table()
     output = re.sub(r' {2,}', ' ', output)
-    with (rootpath / 'duchies_table.txt').open('w') as f:
+    with (rootpath / 'duchies_table.txt').open('w', encoding="utf-8") as f:
         f.write(output)
 
     output = format_counties_table()
     output = re.sub(r' {2,}', ' ', output)
-    with (rootpath / 'counties_table.txt').open('w') as f:
+    with (rootpath / 'counties_table.txt').open('w', encoding="utf-8") as f:
         f.write(output)
 
     output = format_other_provs_table()
     output = re.sub(r' {2,}', ' ', output)
-    with (rootpath / 'other_provs_table.txt').open('w') as f:
+    with (rootpath / 'other_provs_table.txt').open('w', encoding="utf-8") as f:
         f.write(output)
 
     province_map_out = rootpath
@@ -842,9 +884,17 @@ def main():
 
     # import pdb;pdb.set_trace()
 
+
 # def parse_map_test():
 #     Title.province_graph = networkx.Graph()
 #     parse_map_provinces(CKII_DIR / 'map/provinces_test.bmp')
+
+def mytran(row: dict):
+    for word in row:
+        if row[word] in dict_tr:
+            row[word] = dict_tr[row[word]]
+    return row
+
 
 if __name__ == '__main__':
     start_time = time.time()
